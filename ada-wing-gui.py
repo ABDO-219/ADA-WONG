@@ -6,8 +6,13 @@ import shutil
 import subprocess
 import sys
 import threading
-import tkinter as tk
-from tkinter import messagebox, scrolledtext
+
+try:
+    import tkinter as tk
+    from tkinter import messagebox, scrolledtext
+except ModuleNotFoundError:
+    print("خطأ: مكتبة Tkinter غير مثبتة. قم بتشغيل: sudo apt update && sudo apt install -y python3-tk", file=sys.stderr)
+    sys.exit(1)
 
 APP_TITLE = "ADA-WING GUI"
 
@@ -195,8 +200,14 @@ class AdaWingGui(tk.Tk):
 
 
 def main():
-    app = AdaWingGui()
-    app.mainloop()
+    try:
+        app = AdaWingGui()
+        app.mainloop()
+    except tk.TclError as exc:
+        if "no display name" in str(exc).lower() or "display" in str(exc).lower():
+            print("خطأ: لا يوجد عرض رسومي متاح. شغّل البرنامج من جلسة سطح مكتب أو من قائمة التطبيقات.", file=sys.stderr)
+            sys.exit(1)
+        raise
 
 
 if __name__ == "__main__":
