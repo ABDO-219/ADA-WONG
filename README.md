@@ -15,3 +15,11 @@
 - `./ada-wing monitor`
 - `./ada-wing disk`
 - `./ada-wing shell`
+
+## الواجهة الرسومية
+
+لتشغيل الواجهة الرسومية بعد التثبيت:
+
+- `ada-wing-gui`
+
+أو من قائمة التطبيقات بعد تشغيل `./install-ada-wing.sh`.

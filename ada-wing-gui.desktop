@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=ADA-WING GUI
+Comment=واجهة رسومية لأداة ADA-WING
+Exec=/usr/local/bin/ada-wing-gui
+Icon=utilities-terminal
+Terminal=false
+Categories=Utility;System;
+StartupNotify=true
