@@ -1,0 +1,219 @@
+#!/usr/bin/env python3
+"""ADA-WING: تطبيق موجة أوامر لنظام Linux Lite."""
+
+import argparse
+import os
+import platform
+import shutil
+import subprocess
+import sys
+from datetime import datetime
+
+COLOR_BLUE = "\033[94m"
+COLOR_GREEN = "\033[92m"
+COLOR_YELLOW = "\033[93m"
+COLOR_RED = "\033[91m"
+COLOR_RESET = "\033[0m"
+
+
+def info(text: str) -> None:
+    print(f"{COLOR_BLUE}[INFO]{COLOR_RESET} {text}")
+
+
+def success(text: str) -> None:
+    print(f"{COLOR_GREEN}[OK]{COLOR_RESET} {text}")
+
+
+def warning(text: str) -> None:
+    print(f"{COLOR_YELLOW}[WARN]{COLOR_RESET} {text}")
+
+
+def error(text: str) -> None:
+    print(f"{COLOR_RED}[ERROR]{COLOR_RESET} {text}")
+
+
+def run_command(command, sudo=False, capture_output=False):
+    if sudo and os.geteuid() != 0:
+        command.insert(0, "sudo")
+    try:
+        result = subprocess.run(
+            command,
+            check=True,
+            stdout=subprocess.PIPE if capture_output else None,
+            stderr=subprocess.PIPE if capture_output else None,
+            text=True,
+        )
+        return result.stdout if capture_output else None
+    except subprocess.CalledProcessError as exc:
+        if capture_output:
+            error(exc.stderr.strip() if exc.stderr else str(exc))
+        else:
+            error(f"فشل تنفيذ الأمر: {' '.join(command)}")
+        sys.exit(exc.returncode)
+
+
+def ensure_linux_lite():
+    try:
+        with open("/etc/os-release", "r", encoding="utf-8") as f:
+            content = f.read().lower()
+    except FileNotFoundError:
+        warning("لا يمكن قراءة /etc/os-release. تأكد من أنك على نظام Linux." )
+        return
+    if "linux lite" not in content and "linuxlite" not in content:
+        warning("هذا التطبيق مخصص لنظام Linux Lite، لكن نظامك قد يكون مختلفًا.")
+
+
+def command_sysinfo(args):
+    ensure_linux_lite()
+    info("معلومات النظام:")
+    print(f"الإصدار: {platform.platform()}")
+    print(f"النواة: {platform.release()}")
+    print(f"المعالج: {platform.processor() or 'غير متاح'}")
+    uptime = run_command(["uptime", "-p"], capture_output=True).strip()
+    print(f"مدة التشغيل: {uptime}")
+    meminfo = run_command(["free", "-h"], capture_output=True)
+    print("\nالذاكرة:")
+    print(meminfo.strip())
+    diskinfo = run_command(["df", "-h", "--total"], capture_output=True)
+    print("\nالتخزين:")
+    print(diskinfo.strip())
+
+
+def command_update(args):
+    ensure_linux_lite()
+    info("تحديث قوائم الحزم وترقية النظام...")
+    run_command(["apt", "update"], sudo=True)
+    run_command(["apt", "upgrade", "-y"], sudo=True)
+    success("تم تحديث النظام بنجاح.")
+
+
+def command_clean(args):
+    ensure_linux_lite()
+    info("تنظيف الحزم المؤقتة والقديمة...")
+    run_command(["apt", "autoremove", "-y"], sudo=True)
+    run_command(["apt", "autoclean"], sudo=True)
+    success("اكتمل التنظيف.")
+
+
+def command_netcheck(args):
+    ensure_linux_lite()
+    info("فحص الشبكة واتصال الإنترنت...")
+    run_command(["ip", "addr"], capture_output=False)
+    ping_host = args.host or "8.8.8.8"
+    info(f"اختبار الاتصال إلى {ping_host}...")
+    run_command(["ping", "-c", "4", ping_host])
+
+
+def command_pkg_search(args):
+    ensure_linux_lite()
+    if not args.query:
+        error("يجب تحديد كلمة بحث.")
+        sys.exit(1)
+    info(f"البحث عن الحزمة: {args.query}")
+    run_command(["apt", "search", args.query])
+
+
+def command_service(args):
+    ensure_linux_lite()
+    if args.action not in ["start", "stop", "restart", "status", "enable", "disable"]:
+        error("يجب اختيار إجراء صالح: start, stop, restart, status, enable, disable")
+        sys.exit(1)
+    if not args.service:
+        error("يجب تحديد اسم الخدمة.")
+        sys.exit(1)
+    info(f"تنفيذ {args.action} على الخدمة {args.service}")
+    run_command(["systemctl", args.action, args.service], sudo=True)
+
+
+def command_user(args):
+    ensure_linux_lite()
+    if args.action not in ["add", "remove"]:
+        error("يجب اختيار إجراء صالح: add أو remove")
+        sys.exit(1)
+    if not args.username:
+        error("يجب تحديد اسم المستخدم.")
+        sys.exit(1)
+    if args.action == "add":
+        info(f"إضافة المستخدم {args.username}")
+        run_command(["adduser", args.username], sudo=True)
+    else:
+        info(f"حذف المستخدم {args.username}")
+        run_command(["deluser", args.username], sudo=True)
+
+
+def command_find(args):
+    ensure_linux_lite()
+    path = args.path or "/"
+    pattern = args.pattern
+    if not pattern:
+        error("يجب تحديد نمط البحث.")
+        sys.exit(1)
+    info(f"البحث عن الملفات التي تطابق '{pattern}' في {path}")
+    run_command(["find", path, "-iname", f"*{pattern}*", "-print"], capture_output=False)
+
+
+def command_monitor(args):
+    ensure_linux_lite()
+    info("عرض حالة العمليات والنظام...")
+    run_command(["top", "-b", "-n", "1"])
+
+
+def command_disk(args):
+    ensure_linux_lite()
+    info("تفاصيل الأقراص:")
+    run_command(["lsblk", "-f"])
+    run_command(["df", "-h"])
+
+
+def command_shell(args):
+    ensure_linux_lite()
+    info("فتح قشرة Bash جديدة. لإنهاء، اكتب exit.")
+    os.execvp("bash", ["bash"])
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(
+        prog="ADA-WING",
+        description="أداة موجة أوامر مخصصة لنظام Linux Lite.",
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
+    parser.add_argument("--version", action="version", version="ADA-WING 1.0")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    subparsers.add_parser("sysinfo", help="عرض معلومات النظام الأساسية.").set_defaults(func=command_sysinfo)
+    subparsers.add_parser("update", help="تحديث النظام وترقية الحزم.").set_defaults(func=command_update)
+    subparsers.add_parser("clean", help="تنظيف الحزم المؤقتة وغير المستخدمة.").set_defaults(func=command_clean)
+    subparsers.add_parser("netcheck", help="فحص الشبكة واتصال الإنترنت.").set_defaults(func=command_netcheck).add_argument("--host", help="المضيف لاختبار ping", default="8.8.8.8")
+    pkg_parser = subparsers.add_parser("pkg-search", help="البحث في مستودعات apt عن حزم.")
+    pkg_parser.add_argument("query", help="نمط البحث عن الحزمة")
+    pkg_parser.set_defaults(func=command_pkg_search)
+    service_parser = subparsers.add_parser("service", help="إدارة خدمات systemd.")
+    service_parser.add_argument("action", choices=["start", "stop", "restart", "status", "enable", "disable"], help="الإجراء المطلوب")
+    service_parser.add_argument("service", help="اسم الخدمة")
+    service_parser.set_defaults(func=command_service)
+    user_parser = subparsers.add_parser("user", help="إدارة المستخدمين.")
+    user_parser.add_argument("action", choices=["add", "remove"], help="إضافة أو إزالة مستخدم")
+    user_parser.add_argument("username", help="اسم المستخدم")
+    user_parser.set_defaults(func=command_user)
+    find_parser = subparsers.add_parser("find", help="بحث عن ملفات في النظام.")
+    find_parser.add_argument("pattern", help="نمط البحث")
+    find_parser.add_argument("--path", help="المسار لبدء البحث", default="/")
+    find_parser.set_defaults(func=command_find)
+    subparsers.add_parser("monitor", help="عرض ملخص العمليات ونظام الموارد.").set_defaults(func=command_monitor)
+    subparsers.add_parser("disk", help="عرض حالة الأقراص والتخزين.").set_defaults(func=command_disk)
+    subparsers.add_parser("shell", help="فتح قشرة Bash جديدة.").set_defaults(func=command_shell)
+
+    return parser
+
+
+def main():
+    if sys.version_info < (3, 8):
+        error("يتطلب ADA-WING Python 3.8 أو أحدث.")
+        sys.exit(1)
+    parser = build_parser()
+    args = parser.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

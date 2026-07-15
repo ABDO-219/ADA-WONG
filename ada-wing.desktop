@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=ADA-WING
+Comment=أداة موجة أوامر لنظام Linux Lite
+Exec=ada-wing
+Icon=utilities-terminal
+Terminal=true
+Categories=Utility;System;
+StartupNotify=true
